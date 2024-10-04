@@ -1,0 +1,31 @@
+{
+    "manifest_version": 3,
+    "name": "Trend Surfer",
+    "version": "1.0",
+    "description": "Surf through trending searches",
+    "permissions": [
+      "storage",
+      "tabs",
+      "scripting",
+      "windows"
+    ],
+    "host_permissions": [
+      "https://trends.google.com/*",
+      "https://x.com/*"
+    ],
+    "background": {
+      "service_worker": "background.js"
+    },
+    "content_scripts": [
+
+    ],
+    "commands": {
+      "next-trend": {
+        "suggested_key": {
+          "default": "Ctrl+Right",
+          "mac": "Command+Right"
+        },
+        "description": "Navigate to next trend"
+      }
+    }
+  }
