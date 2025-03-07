@@ -1,6 +1,6 @@
-
-
 chrome.commands.onCommand.addListener(onCommand);
+chrome.notifications.onButtonClicked.addListener(onNotifiactionButtonClicked)
+  
 
 async function onCommand(command) {
     
@@ -14,30 +14,45 @@ async function onCommand(command) {
       }
 }
 
+async function onNotifiactionButtonClicked(id, buttonIndex) {
+    if (buttonIndex == 1) {
+        navigateToNextTrend();
+    }
+}
+
 
 function fetchTrends() {
-    const url = 'https://trends.google.com/trends/api/dailytrends?hl=en-US&tz=-480&geo=US';
+    // Use Google's RSS-to-JSON API
+    const rssUrl = 'https://trends.google.com/trending/rss?geo=US';
+    const url = `https://api.rss2json.com/v1/api.json?rss_url=${encodeURIComponent(rssUrl)}`;
     
     fetch(url)
-      .then(response => response.text())
-      .then(text => {
-        // The response starts with `)]}',\n` which we need to remove
-        const json = JSON.parse(text.slice(5));
-        let trends = json.default.trendingSearchesDays[0].trendingSearches
-          .map(trend => ({
-            topic: trend.title.query,
-            volume: trend.formattedTraffic,
-            hoursActive: 24 // API doesn't provide this, so we assume 24 hours
-          }))
-          .slice(0, 25);
+      .then((response) => response.json())
+      .then(async (data) => {
+        let trends = [];
+        for (const item of data.items) {
+            const topic = item.title;
+            const description = item.description;
+            const imageMatch = description.match(/src="([^"]+)"/);
+            const imageUrl = imageMatch ? imageMatch[1] : '';
+            // Extract traffic volume from description if available, otherwise use a default
+            const volumeMatch = description.match(/(\d+)\+/);
+            const volume = volumeMatch ? parseInt(volumeMatch[1]) : 500;
+
+            trends.push({
+                topic,
+                volume,
+                imageUrl,
+            });
+        }
         
-        set({ trends, currentIndex: -1 });
-        navigateToNextTrend();
+        await set({ trends, currentIndex: -1 });
+        await navigateToNextTrend();
       })
       .catch(error => {
         console.error('Error fetching trends:', error);
       });
-  }
+}
 
 
 async function navigateToNextTrend() {    
@@ -50,6 +65,8 @@ async function navigateToNextTrend() {
   if (currentIndex === 0 && resultTabId) {
     // If we've cycled through all trends, remove the result tab
     chrome.tabs.remove(resultTabId);
+    trends = null;
+    set({ trends });
     resultTabId = null;
     set({ resultTabId });
     return;
@@ -72,6 +89,23 @@ async function navigateToNextTrend() {
       set({ resultTabId: id });
     });
   }
+  if (currentIndex + 1 != trends.length) {
+    const nextTrend = trends[currentIndex + 1]
+    console.log('next trend');
+    console.log(nextTrend);
+    chrome.notifications.create('next-trend', {
+      buttons: [{title:'Close'},{title:'Next'}],
+      iconUrl: nextTrend.imageUrl,
+      title: 'Next Search',
+      //imageUrl: nextTrend.imageUrl,
+      message: nextTrend.topic,
+      progress: parseInt(currentIndex / trends.length),
+      //silent: true,
+      type: 'basic',
+    });
+
+  }
+  
 }
 
 const get = async (key) => {
